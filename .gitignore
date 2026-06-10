@@ -1,0 +1,17 @@
+# Rust
+/target
+
+# angreal (the .angreal/ task files ARE versioned; their bytecode is not)
+.angreal/__pycache__/
+.angreal/*.pyc
+
+# Claude local (machine-specific)
+.claude/settings.local.json
+
+# Metis derived state (markdown docs are the source of truth)
+.metis/metis.db
+.metis/*.log
+.metis/.index-dirty
+# Regenerated each session by the code-index hook (code-index.md is kept).
+.metis/code-index-hashes.json
+.metis/code-index-symbols.json

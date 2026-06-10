@@ -1,0 +1,19 @@
+[package]
+name = "diesel-dualdb-macros"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.86"
+description = "Procedural macros for diesel-dualdb (test harness + bridge codegen)."
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+keywords = ["diesel", "macros", "postgres", "sqlite"]
+categories = ["database"]
+repository = "https://github.com/colliery-io/diesel-dualdb"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "2", features = ["full"] }
+quote = "1"
+proc-macro2 = "1"

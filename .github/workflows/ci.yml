@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  # Reused by the release workflow so the pre-publish gate runs the exact same
+  # checks as CI (no drift between "CI passed" and "safe to publish").
+  workflow_call:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: test + lint
+    runs-on: ubuntu-latest
+
+    # Postgres as a GitHub Actions service container — simpler than running the
+    # docker-compose stack inside CI. The test suite reads DUALDB_PG_URL; SQLite
+    # is in-memory and needs nothing. (Local dev still uses `angreal test all`,
+    # which drives docker-compose; CI mirrors the same cargo invocations.)
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: dualdb
+          POSTGRES_PASSWORD: dualdb
+          POSTGRES_DB: dualdb_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dualdb -d dualdb_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+
+    env:
+      DUALDB_PG_URL: postgres://dualdb:dualdb@localhost:5432/dualdb_test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Diesel's postgres/sqlite backends link the system client libraries.
+      - name: Install system libraries
+        run: sudo apt-get update && sudo apt-get install -y libpq-dev libsqlite3-dev
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+      - name: Feature matrix
+        run: |
+          cargo check --no-default-features
+          cargo check
+          cargo check --no-default-features --features uuid
+          cargo check --no-default-features --features chrono
+          cargo check --no-default-features --features serde_json
+          cargo check --no-default-features --features decimal
+          cargo check --no-default-features --features array
+          cargo check --all-features
+
+      # The committed schema/generated must match what the generator produces.
+      - name: Schema freshness
+        run: |
+          cargo run -q -p diesel-dualdb-cli -- schema/migrations /tmp/schema-check
+          diff -r /tmp/schema-check schema/generated
+
+      - name: Test (SQLite + Postgres)
+        run: cargo test --workspace --all-features
+
+  msrv:
+    name: msrv (1.86)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install system libraries
+        run: sudo apt-get update && sudo apt-get install -y libpq-dev libsqlite3-dev
+      - name: Install Rust 1.86
+        uses: dtolnay/rust-toolchain@1.86.0
+      - uses: Swatinem/rust-cache@v2
+      # Compile-only: proves the declared MSRV actually builds the crate.
+      - name: Check (all features)
+        run: cargo check --all-features

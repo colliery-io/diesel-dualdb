@@ -1,0 +1,9 @@
+[project]
+prefix = "DDB"
+
+[flight_levels]
+initiatives_enabled = true
+
+[viewer]
+proactive_open = false
+background = false

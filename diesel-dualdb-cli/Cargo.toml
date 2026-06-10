@@ -1,0 +1,19 @@
+[package]
+name = "diesel-dualdb-cli"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.86"
+description = "Schema & migration generator for diesel-dualdb: one logical schema → per-backend migration trees + a unified schema.rs."
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/colliery-io/diesel-dualdb"
+keywords = ["diesel", "postgres", "sqlite", "migrations", "codegen"]
+categories = ["database", "command-line-utilities"]
+
+# Installed binary: `cargo install diesel-dualdb-cli` -> `diesel-dualdb-schema`.
+[[bin]]
+name = "diesel-dualdb-schema"
+path = "src/main.rs"
+
+[dependencies]
+sqlparser = "0.52"

@@ -1,0 +1,77 @@
+[package]
+name = "diesel-dualdb"
+version = "0.1.0"
+edition = "2021"
+# MSRV is bound by diesel 2.3.10, which declares rust-version = "1.86.0".
+rust-version = "1.86"
+description = "Write Diesel query code once, run it on both PostgreSQL and SQLite."
+license = "MIT OR Apache-2.0"
+keywords = ["diesel", "postgres", "sqlite", "database", "orm"]
+categories = ["database"]
+readme = "README.md"
+repository = "https://github.com/colliery-io/diesel-dualdb"
+homepage = "https://github.com/colliery-io/diesel-dualdb"
+# Whitelist what ships to crates.io — the repo root doubles as the package root,
+# so without this the tarball sweeps in .metis/, .angreal/, docs/, schema/,
+# tests/, etc. Consumers need only the library source + metadata.
+include = [
+    "src/**/*.rs",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE-MIT",
+    "LICENSE-APACHE",
+]
+
+# `diesel-dualdb` is the workspace root package; the proc-macro crate is a member.
+[workspace]
+members = ["diesel-dualdb-macros", "diesel-dualdb-cli"]
+resolver = "2"
+
+[dependencies]
+# Diesel 2.3.x (latest); exact patch locked in Cargo.lock. MultiConnection has
+# been available since 2.1.
+#
+# `returning_clauses_for_sqlite_3_35` is REQUIRED (non-optional) for the bridge:
+# get_result / RETURNING through MultiBackend needs *both* arms to support a
+# RETURNING clause, and diesel gates SQLite's behind this feature (SQLite >= 3.35).
+#
+# Per-type diesel integrations (uuid/chrono/serde_json) are pulled in by *our*
+# matching features below, not here, so they track the optional deps.
+diesel = { version = "2.3", features = [
+    "postgres",
+    "sqlite",
+    "r2d2",
+    "returning_clauses_for_sqlite_3_35",
+] }
+
+diesel-dualdb-macros = { path = "diesel-dualdb-macros", version = "0.1.0" }
+
+uuid = { version = "1", optional = true }
+chrono = { version = "0.4", optional = true }
+serde = { version = "1", optional = true }
+serde_json = { version = "1", optional = true }
+# Matches the bigdecimal version diesel's `numeric` feature expects (cargo
+# unifies the two so `BigDecimal: ToSql<Numeric, Pg>` resolves to one type).
+bigdecimal = { version = "0.4", optional = true }
+
+[features]
+# Default carries every portable type. Each type lives behind its own feature so
+# downstreams can trim deps; each feature also enables diesel's matching
+# integration. (chrono/serde_json types arrive in DDB-T-0008 / DDB-T-0010; the
+# features + deps are wired now so the convention is set.)
+default = ["uuid", "chrono", "serde_json", "decimal", "array"]
+uuid = ["dep:uuid", "diesel/uuid"]
+chrono = ["dep:chrono", "diesel/chrono"]
+serde_json = ["dep:serde_json", "dep:serde", "diesel/serde_json"]
+decimal = ["dep:bigdecimal", "diesel/numeric"]
+# Postgres arrays portably (PG native array / SQLite JSON TEXT); reuses serde_json.
+array = ["serde_json"]
+
+[dev-dependencies]
+# v4 for generating random uuids in the round-trip tests.
+uuid = { version = "1", features = ["v4"] }
+# derive is test-only (for the typed-struct Json round-trip); the library needs
+# only serde's traits, not the proc-macro.
+serde = { version = "1", features = ["derive"] }
+# so the decimal round-trip test can name `BigDecimal`.
+bigdecimal = "0.4"

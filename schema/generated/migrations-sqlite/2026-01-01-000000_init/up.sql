@@ -1,0 +1,1 @@
+CREATE TABLE widgets (id BLOB PRIMARY KEY NOT NULL, name TEXT NOT NULL, data BLOB NOT NULL, meta TEXT, created_at TEXT NOT NULL);

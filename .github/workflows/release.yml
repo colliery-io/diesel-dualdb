@@ -1,0 +1,111 @@
+name: Release
+
+# Releases are cut by pushing a version tag, e.g.:
+#
+#     git tag v0.1.0 && git push origin v0.1.0
+#
+# The tag must match the version in the crate manifests (guarded below). The
+# full CI suite re-runs as a gate, then the three crates publish to crates.io
+# in dependency order.
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  CARGO_TERM_COLOR: always
+
+# Never run two publishes for the same tag concurrently, and never cancel a
+# publish midway (a half-published workspace is painful to recover).
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # Re-run the exact CI checks (fmt, clippy, feature matrix, schema freshness,
+  # tests against Postgres + SQLite, MSRV) as the pre-publish gate.
+  verify:
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    name: publish to crates.io
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      # cargo publish runs a verify build, which compiles diesel's
+      # postgres/sqlite backends and links the system client libraries.
+      - name: Install system libraries
+        run: sudo apt-get update && sudo apt-get install -y libpq-dev libsqlite3-dev
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      # Fail fast if the tag and the manifests disagree — a mismatched tag is
+      # the most common release mistake.
+      - name: Verify tag matches crate versions
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          for crate in diesel-dualdb diesel-dualdb-macros diesel-dualdb-cli; do
+            ver=$(cargo metadata --no-deps --format-version 1 \
+              | jq -r --arg c "$crate" '.packages[] | select(.name==$c) | .version')
+            if [ "$ver" != "$tag" ]; then
+              echo "::error::tag v$tag does not match $crate version $ver"
+              exit 1
+            fi
+          done
+          echo "All crates at $tag — matches tag."
+
+      # Last pre-flight before ANY upload: dry-run the leaf crates so packaging /
+      # metadata errors fail here, while nothing has been published yet. (The
+      # root crate can't be dry-run until macros is on the index — its packaging
+      # is instead covered by the verify build during its own publish step.)
+      - name: Dry-run leaf crates
+        run: |
+          cargo publish -p diesel-dualdb-macros --locked --dry-run
+          cargo publish -p diesel-dualdb-cli --locked --dry-run
+
+      # Publish in dependency order, idempotently. crates.io rejects a crate
+      # whose deps aren't yet in the index, so order is mandatory:
+      #   macros  -> no internal deps
+      #   diesel-dualdb -> depends on macros (must come after it)
+      #   cli     -> independent (sqlparser only)
+      # Cargo (>=1.66) blocks until each version is visible in the index before
+      # returning, so the next crate resolves without manual sleeps.
+      #
+      # Each crate is skipped if that version already exists, so a partial
+      # failure self-heals: just re-run this job (Actions UI -> Re-run) and it
+      # resumes at the first crate that didn't make it.
+      - name: Publish (ordered, idempotent)
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+
+          already_published() {
+            # crates.io enforces a User-Agent; 200 = version exists, 404 = not.
+            local code
+            code=$(curl -s -o /dev/null -w '%{http_code}' \
+              -H 'User-Agent: diesel-dualdb-release (github.com/colliery-io/diesel-dualdb)' \
+              "https://crates.io/api/v1/crates/$1/$version")
+            [ "$code" = "200" ]
+          }
+
+          publish() {
+            if already_published "$1"; then
+              echo "✓ $1 $version already on crates.io — skipping."
+            else
+              echo "→ publishing $1 $version"
+              cargo publish -p "$1" --locked
+            fi
+          }
+
+          publish diesel-dualdb-macros
+          publish diesel-dualdb
+          publish diesel-dualdb-cli
