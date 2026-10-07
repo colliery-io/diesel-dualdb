@@ -19,6 +19,8 @@ extern crate self as diesel_dualdb;
 
 #[cfg(feature = "async")]
 pub mod async_connection;
+#[cfg(feature = "async")]
+pub mod async_pool;
 pub mod backend;
 pub mod escape;
 pub mod pg;
@@ -35,6 +37,10 @@ pub use pg::DualPgConnection;
 /// The async dual-backend connection. See [`async_connection`].
 #[cfg(feature = "async")]
 pub use async_connection::AsyncDualConnection;
+
+/// An async connection pool with backend detection. See [`async_pool`].
+#[cfg(feature = "async")]
+pub use async_pool::AsyncPool;
 
 /// `#[diesel_dualdb::test(pg, sqlite)]` — run one test body against each
 /// backend. See [`diesel_dualdb_macros::test`].

@@ -56,7 +56,10 @@ bigdecimal = { version = "0.4", optional = true }
 
 # `AsyncDualConnection` (feature `async`): native-async Postgres via
 # tokio-postgres, SQLite via diesel-async's `SyncConnectionWrapper`.
-diesel-async = { version = "0.9", features = ["postgres", "sqlite"], optional = true }
+diesel-async = { version = "0.9", features = ["postgres", "sqlite", "deadpool"], optional = true }
+# `AsyncPool`: diesel-async's deadpool integration; `rt_tokio_1` for checkout
+# timeouts. Matches the deadpool version diesel-async 0.9 uses.
+deadpool = { version = "0.13", default-features = false, features = ["managed", "rt_tokio_1"], optional = true }
 futures-util = { version = "0.3", default-features = false, features = ["std"], optional = true }
 # The runtime that `#[diesel_dualdb::test]` on an `async fn` drives the body on.
 tokio = { version = "1", features = ["rt"], optional = true }
@@ -74,7 +77,7 @@ decimal = ["dep:bigdecimal", "diesel/numeric"]
 # Postgres arrays portably (PG native array / SQLite JSON TEXT); reuses serde_json.
 array = ["serde_json"]
 # `AsyncDualConnection`: the same write-once queries over diesel-async.
-async = ["dep:diesel-async", "dep:futures-util", "dep:tokio"]
+async = ["dep:diesel-async", "dep:futures-util", "dep:tokio", "dep:deadpool"]
 
 [dev-dependencies]
 # v4 for generating random uuids in the round-trip tests.
