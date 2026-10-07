@@ -1,6 +1,6 @@
 [package]
 name = "diesel-dualdb"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 # MSRV is bound by diesel 2.3.10, which declares rust-version = "1.86.0".
 rust-version = "1.86"
@@ -44,7 +44,7 @@ diesel = { version = "2.3", features = [
     "returning_clauses_for_sqlite_3_35",
 ] }
 
-diesel-dualdb-macros = { path = "diesel-dualdb-macros", version = "0.1.0" }
+diesel-dualdb-macros = { path = "diesel-dualdb-macros", version = "0.2.0" }
 
 uuid = { version = "1", optional = true }
 chrono = { version = "0.4", optional = true }

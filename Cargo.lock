@@ -276,7 +276,7 @@ dependencies = [
 
 [[package]]
 name = "diesel-dualdb"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bigdecimal",
  "chrono",
@@ -293,14 +293,14 @@ dependencies = [
 
 [[package]]
 name = "diesel-dualdb-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "sqlparser",
 ]
 
 [[package]]
 name = "diesel-dualdb-macros"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "proc-macro2",
  "quote",

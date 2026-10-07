@@ -8,7 +8,7 @@ async, SQLite on `spawn_blocking`. Every portable type works unchanged.
 
 ```toml
 [dependencies]
-diesel-dualdb = { version = "0.1", features = ["async"] }
+diesel-dualdb = { version = "0.2", features = ["async"] }
 diesel-async = "0.9"   # for RunQueryDsl / AsyncConnection
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
