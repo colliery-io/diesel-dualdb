@@ -16,7 +16,7 @@ the derive's generated `MultiBackend` only knows Diesel's core SQL types, so
 bridges portable types onto `MultiBackend`, so write-once queries — inserts with
 `RETURNING` included — work on a single arm against either backend.
 
-> Built on Diesel 2.3, MSRV 1.86. Sync — see [Async](#async).
+> Built on Diesel 2.3, MSRV 1.86. Sync, and async with the `async` feature — see [Async](#async).
 
 📖 **Full documentation lives in [`docs/`](https://github.com/colliery-io/diesel-dualdb/blob/main/docs/index.md)** —
 [Diátaxis](https://diataxis.fr/)-structured tutorials, how-to guides, reference,
@@ -152,9 +152,23 @@ Full walkthrough: [How to add a portable type](https://github.com/colliery-io/di
 
 ## Async
 
-Sync only. To use it from an async runtime, wrap the sync calls in
-`tokio::task::spawn_blocking` (the same model `diesel-async` uses for SQLite); a
-native `AsyncDualConnection` is not provided.
+With the `async` feature, `AsyncDualConnection` runs the same queries through
+[`diesel-async`](https://docs.rs/diesel-async). Postgres is natively async
+(tokio-postgres) and SQLite runs on `spawn_blocking`. Every portable type works:
+
+```rust
+use diesel_async::{AsyncConnection, RunQueryDsl};
+use diesel_dualdb::AsyncDualConnection;
+
+let mut conn = AsyncDualConnection::establish(&database_url).await?;
+let task: Task = diesel::insert_into(tasks::table)
+    .values(&new)
+    .get_result(&mut conn)
+    .await?;
+```
+
+`AsyncPool::connect` pools it (deadpool), and `#[diesel_dualdb::test]` also
+works on an `async fn`. See [How to use async](https://github.com/colliery-io/diesel-dualdb/blob/main/docs/how-to/use-async.md).
 
 ## Development
 

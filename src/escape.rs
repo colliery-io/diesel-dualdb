@@ -42,7 +42,7 @@ impl DualConnection {
         sqlite: impl FnOnce(&mut SqliteConnection) -> R,
     ) -> R {
         match self {
-            DualConnection::Pg(conn) => pg(conn),
+            DualConnection::Pg(conn) => pg(&mut conn.0),
             DualConnection::Sqlite(conn) => sqlite(conn),
         }
     }

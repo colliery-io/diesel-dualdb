@@ -41,4 +41,9 @@ A `:memory:` database is **per connection**, so a multi-connection pool over
 `:memory:` gives each checkout its own empty database. For pooled SQLite, use a
 file (or `file::memory:?cache=shared`), or cap the pool at `max_size(1)`.
 
+## Async
+
+With the `async` feature, `AsyncPool::connect` is the same one-liner over
+deadpool, yielding `AsyncDualConnection`. See [How to use async](use-async.md#pool).
+
 See also: [Architecture](../explanation/architecture.md).

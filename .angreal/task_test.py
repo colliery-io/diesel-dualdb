@@ -48,9 +48,10 @@ def _wait_for_pg(dc, timeout=60):
 
 
 def _cargo_test(env):
-    # --workspace so the macro + cli crates' tests run too.
+    # --workspace so the macro + cli crates' tests run too; --all-features (as
+    # in CI) so the opt-in `async` tests run.
     return subprocess.run(
-        ["cargo", "test", "--workspace"], cwd=PROJECT_ROOT, env=env
+        ["cargo", "test", "--workspace", "--all-features"], cwd=PROJECT_ROOT, env=env
     ).returncode
 
 

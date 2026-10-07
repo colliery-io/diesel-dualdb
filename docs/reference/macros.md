@@ -27,6 +27,18 @@ fn name(conn: &mut DualConnection) { … }
   generated tests.
 - An unknown backend argument is a compile error.
 
+### On an `async fn` (feature `async`)
+
+```rust
+#[diesel_dualdb::test(pg, sqlite)]
+async fn name(conn: &mut AsyncDualConnection) { … }
+```
+
+The same forms and test names apply. Each generated test opens an
+`AsyncDualConnection` (`:memory:`, or `DUALDB_PG_URL`) and awaits the body on a
+new current-thread tokio runtime. Do not add `#[tokio::test]`: the generated
+tests are plain `#[test]`s.
+
 ## `bridge!`
 
 Function-like macro. Generates the three `MultiBackend` bridge impls for a

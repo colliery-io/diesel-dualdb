@@ -1,6 +1,6 @@
 [package]
 name = "diesel-dualdb-cli"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.86"
 description = "Schema & migration generator for diesel-dualdb: one logical schema → per-backend migration trees + a unified schema.rs."
