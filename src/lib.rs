@@ -17,14 +17,24 @@
 // canonical name `::diesel_dualdb` even from within the crate itself.
 extern crate self as diesel_dualdb;
 
+#[cfg(feature = "async")]
+pub mod async_connection;
 pub mod backend;
 pub mod escape;
+pub mod pg;
 pub mod pool;
 pub mod sql_types;
 pub mod types;
 
 /// A connection pool with backend detection. See [`pool`].
 pub use pool::Pool;
+
+/// The PostgreSQL arm of [`DualConnection`]. See [`pg`].
+pub use pg::DualPgConnection;
+
+/// The async dual-backend connection. See [`async_connection`].
+#[cfg(feature = "async")]
+pub use async_connection::AsyncDualConnection;
 
 /// `#[diesel_dualdb::test(pg, sqlite)]` — run one test body against each
 /// backend. See [`diesel_dualdb_macros::test`].
@@ -46,8 +56,9 @@ pub use diesel_dualdb_macros::DualEnum;
 /// `MultiBackend` locally, with no orphan-rule problem.
 #[derive(diesel::MultiConnection)]
 pub enum DualConnection {
-    /// PostgreSQL arm.
-    Pg(diesel::PgConnection),
+    /// PostgreSQL arm: a [`diesel::PgConnection`], wrapped in
+    /// [`DualPgConnection`] (which derefs to it).
+    Pg(DualPgConnection),
     /// SQLite arm.
     Sqlite(diesel::SqliteConnection),
 }

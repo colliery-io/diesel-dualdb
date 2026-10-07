@@ -54,6 +54,11 @@ serde_json = { version = "1", optional = true }
 # unifies the two so `BigDecimal: ToSql<Numeric, Pg>` resolves to one type).
 bigdecimal = { version = "0.4", optional = true }
 
+# `AsyncDualConnection` (feature `async`): native-async Postgres via
+# tokio-postgres, SQLite via diesel-async's `SyncConnectionWrapper`.
+diesel-async = { version = "0.9", features = ["postgres", "sqlite"], optional = true }
+futures-util = { version = "0.3", default-features = false, features = ["std"], optional = true }
+
 [features]
 # Default carries every portable type. Each type lives behind its own feature so
 # downstreams can trim deps; each feature also enables diesel's matching
@@ -66,6 +71,8 @@ serde_json = ["dep:serde_json", "dep:serde", "diesel/serde_json"]
 decimal = ["dep:bigdecimal", "diesel/numeric"]
 # Postgres arrays portably (PG native array / SQLite JSON TEXT); reuses serde_json.
 array = ["serde_json"]
+# `AsyncDualConnection`: the same write-once queries over diesel-async.
+async = ["dep:diesel-async", "dep:futures-util"]
 
 [dev-dependencies]
 # v4 for generating random uuids in the round-trip tests.
@@ -75,3 +82,5 @@ uuid = { version = "1", features = ["v4"] }
 serde = { version = "1", features = ["derive"] }
 # so the decimal round-trip test can name `BigDecimal`.
 bigdecimal = "0.4"
+# runtime for the async tests.
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

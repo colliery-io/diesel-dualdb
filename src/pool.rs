@@ -18,7 +18,7 @@ use std::fmt;
 use diesel::prelude::*;
 use diesel::r2d2::{ManageConnection, PoolError, R2D2Connection};
 
-use crate::DualConnection;
+use crate::{DualConnection, DualPgConnection};
 
 /// Which backend a URL refers to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -69,7 +69,7 @@ impl ManageConnection for DualConnectionManager {
 
     fn connect(&self) -> Result<DualConnection, Self::Error> {
         let conn = match self.backend {
-            Backend::Postgres => PgConnection::establish(&self.url).map(DualConnection::Pg),
+            Backend::Postgres => DualPgConnection::establish(&self.url).map(DualConnection::Pg),
             Backend::Sqlite => {
                 // `detect_backend` accepts a `sqlite://` URL, but diesel's
                 // `SqliteConnection::establish` wants a bare path or a `file:`

@@ -81,7 +81,7 @@ pub fn test(attr: TokenStream, item: TokenStream) -> TokenStream {
                     }
                 };
                 let mut __dualdb_conn = ::diesel_dualdb::DualConnection::Pg(
-                    <::diesel::PgConnection as ::diesel::Connection>::establish(&__dualdb_url)
+                    <::diesel_dualdb::DualPgConnection as ::diesel::Connection>::establish(&__dualdb_url)
                         .expect("dualdb::test: connect to postgres"),
                 );
                 #name(&mut __dualdb_conn);
