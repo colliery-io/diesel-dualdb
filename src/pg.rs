@@ -8,8 +8,8 @@
 //! bridge could never collect Postgres binds for diesel-async's
 //! `AsyncPgConnection`, whose lookup is a different type. Owning the arm type
 //! lets [`from_any`](MultiConnectionHelper::from_any) also accept that lookup
-//! (see [`ForeignPgLookup`]), which is what makes
-//! [`AsyncDualConnection`](crate::AsyncDualConnection) possible.
+//! (wrapped for the length of one bind pass), which is what makes
+//! `AsyncDualConnection` (feature `async`) possible.
 //!
 //! Everything else delegates to the inner `PgConnection`, and the newtype
 //! derefs to it, so Postgres-only APIs stay one `&mut *conn` away.

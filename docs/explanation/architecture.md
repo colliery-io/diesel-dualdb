@@ -23,10 +23,13 @@ can implement the bridge traits locally — no orphan-rule problem:
 ```rust
 #[derive(diesel::MultiConnection)]
 pub enum DualConnection {
-    Pg(diesel::PgConnection),
+    Pg(DualPgConnection),   // a newtype over diesel::PgConnection; derefs to it
     Sqlite(diesel::SqliteConnection),
 }
 ```
+
+The Postgres arm is a newtype so that `MultiBackend` can also collect binds for
+the async connection. See [Explanation: async](async.md).
 
 For each portable type, the bridge implements three traits against the generated
 `MultiBackend`:
@@ -57,6 +60,10 @@ macro can generate them, and why a non-generic type's bridge is one line.
 ```
 src/
   lib.rs           DualConnection (#[derive(MultiConnection)]) + re-exports
+  pg.rs            DualPgConnection, the Postgres arm
+  pool.rs          Pool (r2d2) + URL/scheme detection
+  async_connection.rs  AsyncDualConnection (feature `async`)
+  async_pool.rs    AsyncPool (deadpool, feature `async`)
   sql_types.rs     portable markers
   types/           uuid/bytes/timestamp/json/decimal/array .rs  (per-backend ToSql/FromSql)
   backend.rs       the MultiBackend bridge (bridge! lines + the hand-written Json block)

@@ -24,6 +24,7 @@ each serving a different need. Start wherever your need lives.
 - [Add a portable type](how-to/add-a-portable-type.md)
 - [Diverge per backend (the escape hatch)](how-to/diverge-per-backend.md)
 - [Pool connections](how-to/pool-connections.md)
+- [Use async](how-to/use-async.md) — `AsyncDualConnection`, `AsyncPool`, async tests
 
 ### Reference
 - [Portable types](reference/portable-types.md)
@@ -36,12 +37,13 @@ each serving a different need. Start wherever your need lives.
 - [Architecture](explanation/architecture.md) — `MultiBackend` and the bridge
 - [Schema generation](explanation/schema-generation.md) — why a logical schema
 - [Timestamp representation](explanation/timestamp-representation.md)
+- [Async](explanation/async.md) — how `AsyncDualConnection` reuses the bridge
 
 ## Status
 
-Sync backend, v1. The portable type layer, the `MultiBackend` bridge, the
-test/bridge macros, the schema generator, connection pooling with URL detection
-(`Pool::connect`), and the `dispatch` escape hatch all work today. **Async** is
-the planned fast-follow — see [Design philosophy](explanation/design-philosophy.md)
-for the roadmap. Anything not documented here as working should be assumed not
-yet built.
+The portable type layer, the `MultiBackend` bridge, the test/bridge macros, the
+schema generator, connection pooling with URL detection (`Pool::connect`), and
+the `dispatch` escape hatch all work today. **Async** (feature `async`) works
+too: `AsyncDualConnection`, `AsyncPool`, and async `#[diesel_dualdb::test]`. See
+[Use async](how-to/use-async.md). Anything not documented here as working should
+be assumed not yet built.

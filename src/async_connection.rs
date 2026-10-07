@@ -29,7 +29,7 @@
 //! collects the binds through that arm's `MultiBackend` bind collector —
 //! the same steps the derive's private `SerializedQuery` takes for the sync
 //! connection. The Postgres bind pass hands diesel-async's metadata lookup
-//! through [`ForeignPgLookup`], which [`DualPgConnection`] accepts.
+//! through a small wrapper that [`DualPgConnection`] accepts.
 //!
 //! [`DualPgConnection`]: crate::DualPgConnection
 

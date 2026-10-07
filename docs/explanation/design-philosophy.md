@@ -61,9 +61,10 @@ dilute the value and the testing story; MySQL is resisted.
 - **v1 (sync):** portable types, the `MultiBackend` bridge, the test and bridge
   macros, the schema generator, `Pool::connect` with URL/scheme detection, and
   the `dispatch` escape hatch.
-- **v2:** an async `DualConnection` (there is no `MultiConnection` equivalent in
-  `diesel-async`, so it must be hand-built — Postgres native, SQLite via
-  `SyncConnectionWrapper`).
+- **v2 (async, done):** `AsyncDualConnection`, written by hand because
+  `diesel-async` has no `MultiConnection` equivalent. Postgres is native async
+  and SQLite runs through `SyncConnectionWrapper`. Also `AsyncPool`, and
+  `#[diesel_dualdb::test]` on `async fn`. See [Explanation: async](async.md).
 - **Won't-fix in-crate (see ADR DDB-A-0002):** a *native-type compatibility
   shim* (use `diesel::sql_types::Uuid` etc. directly) is impossible — the orphan
   rule blocks the SQLite impls and diesel doesn't support those PG-native types

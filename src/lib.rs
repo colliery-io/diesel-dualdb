@@ -6,6 +6,9 @@
 //! ([`types`]) onto the generated `MultiBackend` so `get_result`/`RETURNING`
 //! work on one arm against either backend.
 //!
+//! With the `async` feature, `AsyncDualConnection` (and `AsyncPool`) run the
+//! same queries through diesel-async: see the `async_connection` module.
+//!
 //! Both-backend tests are written with the [`test`] attribute:
 //!
 //! ```ignore
