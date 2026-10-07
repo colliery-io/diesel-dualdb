@@ -66,6 +66,7 @@ jobs:
           cargo check --no-default-features --features serde_json
           cargo check --no-default-features --features decimal
           cargo check --no-default-features --features array
+          cargo check --no-default-features --features async
           cargo check --all-features
 
       # The committed schema/generated must match what the generator produces.

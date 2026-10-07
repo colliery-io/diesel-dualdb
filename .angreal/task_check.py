@@ -23,6 +23,7 @@ FEATURE_SETS = [
     ["--no-default-features", "--features", "serde_json"],
     ["--no-default-features", "--features", "decimal"],
     ["--no-default-features", "--features", "array"],
+    ["--no-default-features", "--features", "async"],
     ["--all-features"],
 ]
 

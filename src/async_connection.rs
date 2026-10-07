@@ -12,7 +12,7 @@
 //!   each query onto `spawn_blocking` (SQLite has no async driver).
 //!
 //! ```no_run
-//! # async fn demo() -> diesel::QueryResult<()> {
+//! # async fn demo() -> Result<(), Box<dyn std::error::Error>> {
 //! use diesel_async::{AsyncConnection, RunQueryDsl};
 //! use diesel_dualdb::AsyncDualConnection;
 //!
@@ -72,6 +72,9 @@ pub type AsyncSqliteConnection = SyncConnectionWrapper<SqliteConnection>;
 /// [`AsyncConnection::establish`] picks the arm from the URL scheme, like
 /// [`Pool::connect`](crate::Pool::connect): `postgres://` / `postgresql://` →
 /// Postgres; `sqlite://`, `file:`, `:memory:` or a bare path → SQLite.
+// The Pg arm is larger, but a connection is long-lived and few: boxing it would
+// cost an allocation and change the variant's shape for no real gain.
+#[allow(clippy::large_enum_variant)]
 pub enum AsyncDualConnection {
     /// PostgreSQL arm: native async.
     Pg(AsyncPgConnection),
@@ -331,12 +334,10 @@ impl Future for ExecuteFuture<'_, '_> {
 // ----- connection -----
 
 impl SimpleAsyncConnection for AsyncDualConnection {
-    fn batch_execute(&mut self, query: &str) -> impl Future<Output = QueryResult<()>> + Send {
-        async move {
-            match self {
-                AsyncDualConnection::Pg(conn) => conn.batch_execute(query).await,
-                AsyncDualConnection::Sqlite(conn) => conn.batch_execute(query).await,
-            }
+    async fn batch_execute(&mut self, query: &str) -> QueryResult<()> {
+        match self {
+            AsyncDualConnection::Pg(conn) => conn.batch_execute(query).await,
+            AsyncDualConnection::Sqlite(conn) => conn.batch_execute(query).await,
         }
     }
 }
@@ -385,26 +386,24 @@ impl AsyncConnectionCore for AsyncDualConnection {
 impl AsyncConnection for AsyncDualConnection {
     type TransactionManager = Self;
 
-    fn establish(database_url: &str) -> impl Future<Output = ConnectionResult<Self>> + Send {
-        async move {
-            match detect_backend(database_url) {
-                Some(UrlBackend::Postgres) => AsyncPgConnection::establish(database_url)
+    async fn establish(database_url: &str) -> ConnectionResult<Self> {
+        match detect_backend(database_url) {
+            Some(UrlBackend::Postgres) => AsyncPgConnection::establish(database_url)
+                .await
+                .map(AsyncDualConnection::Pg),
+            Some(UrlBackend::Sqlite) => {
+                // As in `Pool`: diesel's SQLite wants a bare path or a
+                // `file:` URI, so strip a `sqlite://` scheme.
+                let path = database_url
+                    .strip_prefix("sqlite://")
+                    .unwrap_or(database_url);
+                AsyncSqliteConnection::establish(path)
                     .await
-                    .map(AsyncDualConnection::Pg),
-                Some(UrlBackend::Sqlite) => {
-                    // As in `Pool`: diesel's SQLite wants a bare path or a
-                    // `file:` URI, so strip a `sqlite://` scheme.
-                    let path = database_url
-                        .strip_prefix("sqlite://")
-                        .unwrap_or(database_url);
-                    AsyncSqliteConnection::establish(path)
-                        .await
-                        .map(AsyncDualConnection::Sqlite)
-                }
-                None => Err(ConnectionError::InvalidConnectionUrl(format!(
-                    "unsupported database URL scheme: {database_url}"
-                ))),
+                    .map(AsyncDualConnection::Sqlite)
             }
+            None => Err(ConnectionError::InvalidConnectionUrl(format!(
+                "unsupported database URL scheme: {database_url}"
+            ))),
         }
     }
 
@@ -442,30 +441,24 @@ type SqliteTm = <AsyncSqliteConnection as AsyncConnection>::TransactionManager;
 impl TransactionManager<AsyncDualConnection> for AsyncDualConnection {
     type TransactionStateData = Self;
 
-    fn begin_transaction(conn: &mut Self) -> impl Future<Output = QueryResult<()>> + Send {
-        async move {
-            match conn {
-                AsyncDualConnection::Pg(c) => PgTm::begin_transaction(c).await,
-                AsyncDualConnection::Sqlite(c) => SqliteTm::begin_transaction(c).await,
-            }
+    async fn begin_transaction(conn: &mut Self) -> QueryResult<()> {
+        match conn {
+            AsyncDualConnection::Pg(c) => PgTm::begin_transaction(c).await,
+            AsyncDualConnection::Sqlite(c) => SqliteTm::begin_transaction(c).await,
         }
     }
 
-    fn rollback_transaction(conn: &mut Self) -> impl Future<Output = QueryResult<()>> + Send {
-        async move {
-            match conn {
-                AsyncDualConnection::Pg(c) => PgTm::rollback_transaction(c).await,
-                AsyncDualConnection::Sqlite(c) => SqliteTm::rollback_transaction(c).await,
-            }
+    async fn rollback_transaction(conn: &mut Self) -> QueryResult<()> {
+        match conn {
+            AsyncDualConnection::Pg(c) => PgTm::rollback_transaction(c).await,
+            AsyncDualConnection::Sqlite(c) => SqliteTm::rollback_transaction(c).await,
         }
     }
 
-    fn commit_transaction(conn: &mut Self) -> impl Future<Output = QueryResult<()>> + Send {
-        async move {
-            match conn {
-                AsyncDualConnection::Pg(c) => PgTm::commit_transaction(c).await,
-                AsyncDualConnection::Sqlite(c) => SqliteTm::commit_transaction(c).await,
-            }
+    async fn commit_transaction(conn: &mut Self) -> QueryResult<()> {
+        match conn {
+            AsyncDualConnection::Pg(c) => PgTm::commit_transaction(c).await,
+            AsyncDualConnection::Sqlite(c) => SqliteTm::commit_transaction(c).await,
         }
     }
 

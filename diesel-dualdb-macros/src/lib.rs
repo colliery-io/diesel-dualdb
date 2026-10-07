@@ -31,6 +31,18 @@ use syn::{parse_macro_input, Data, DeriveInput, Fields, Ident, ItemFn, LitStr, P
 ///
 /// Attributes you put on the function (e.g. `#[should_panic]`) are forwarded to
 /// the generated test functions.
+///
+/// With the `async` feature, apply it to an
+/// `async fn name(conn: &mut AsyncDualConnection)` instead: each generated test
+/// opens an `AsyncDualConnection` (in-memory SQLite, or `DUALDB_PG_URL`) and
+/// awaits the body on a fresh tokio runtime. No `#[tokio::test]` needed.
+///
+/// ```ignore
+/// #[diesel_dualdb::test(pg, sqlite)]
+/// async fn round_trips(conn: &mut AsyncDualConnection) {
+///     // diesel_async::RunQueryDsl queries, awaited
+/// }
+/// ```
 #[proc_macro_attribute]
 pub fn test(attr: TokenStream, item: TokenStream) -> TokenStream {
     let (pg, sqlite) = match parse_backends(attr) {
@@ -47,25 +59,62 @@ pub fn test(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut inner = func;
     inner.attrs.clear();
 
+    let is_async = inner.sig.asyncness.is_some();
     let mut out = quote! { #inner };
+
+    // How each generated test opens its connection and runs the body. Sync:
+    // a `DualConnection` arm. Async: an `AsyncDualConnection` from a URL, with
+    // the body awaited on a fresh tokio runtime.
+    let run = |sync_conn: proc_macro2::TokenStream, url: proc_macro2::TokenStream| {
+        if is_async {
+            quote! {
+                ::diesel_dualdb::__private::block_on(async {
+                    let mut __dualdb_conn = <::diesel_dualdb::AsyncDualConnection
+                        as ::diesel_dualdb::__private::AsyncConnection>::establish(#url)
+                        .await
+                        .expect("dualdb::test: open async connection");
+                    #name(&mut __dualdb_conn).await;
+                })
+            }
+        } else {
+            quote! {
+                let mut __dualdb_conn = #sync_conn;
+                #name(&mut __dualdb_conn);
+            }
+        }
+    };
 
     if sqlite {
         let wname = format_ident!("{}_sqlite", name);
+        let body = run(
+            quote! {
+                ::diesel_dualdb::DualConnection::Sqlite(
+                    <::diesel::SqliteConnection as ::diesel::Connection>::establish(":memory:")
+                        .expect("dualdb::test: open in-memory sqlite"),
+                )
+            },
+            quote! { ":memory:" },
+        );
         out.extend(quote! {
             #(#user_attrs)*
             #[test]
             fn #wname() {
-                let mut __dualdb_conn = ::diesel_dualdb::DualConnection::Sqlite(
-                    <::diesel::SqliteConnection as ::diesel::Connection>::establish(":memory:")
-                        .expect("dualdb::test: open in-memory sqlite"),
-                );
-                #name(&mut __dualdb_conn);
+                #body
             }
         });
     }
 
     if pg {
         let wname = format_ident!("{}_pg", name);
+        let body = run(
+            quote! {
+                ::diesel_dualdb::DualConnection::Pg(
+                    <::diesel_dualdb::DualPgConnection as ::diesel::Connection>::establish(&__dualdb_url)
+                        .expect("dualdb::test: connect to postgres"),
+                )
+            },
+            quote! { &__dualdb_url },
+        );
         out.extend(quote! {
             #(#user_attrs)*
             #[test]
@@ -80,11 +129,7 @@ pub fn test(attr: TokenStream, item: TokenStream) -> TokenStream {
                         return;
                     }
                 };
-                let mut __dualdb_conn = ::diesel_dualdb::DualConnection::Pg(
-                    <::diesel_dualdb::DualPgConnection as ::diesel::Connection>::establish(&__dualdb_url)
-                        .expect("dualdb::test: connect to postgres"),
-                );
-                #name(&mut __dualdb_conn);
+                #body
             }
         });
     }

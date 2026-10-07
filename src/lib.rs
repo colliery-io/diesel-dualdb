@@ -48,6 +48,22 @@ pub use diesel_dualdb_macros::bridge;
 /// `enum` / SQLite `TEXT`). See [`diesel_dualdb_macros::DualEnum`].
 pub use diesel_dualdb_macros::DualEnum;
 
+/// Support code for `#[diesel_dualdb::test]` on an `async fn`. Not public API.
+#[cfg(feature = "async")]
+#[doc(hidden)]
+pub mod __private {
+    pub use diesel_async::AsyncConnection;
+
+    /// Drive a test body to completion on a fresh tokio runtime.
+    pub fn block_on<F: std::future::Future>(future: F) -> F::Output {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("dualdb::test: build tokio runtime")
+            .block_on(future)
+    }
+}
+
 /// The canonical dual-backend connection.
 ///
 /// `#[derive(MultiConnection)]` generates an enum `Connection` impl plus the
