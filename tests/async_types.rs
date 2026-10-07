@@ -518,15 +518,25 @@ mod connection {
         assert_eq!(count(conn).await, 0, "outer transaction rolled back");
     }
 
+    // Clippy 1.99 flags the `QueryableByName` derive's own expansion; the allow
+    // must sit on a module, since the derive's impl is a separate item.
+    #[allow(clippy::redundant_field_names)]
+    mod raw {
+        use diesel::QueryableByName;
+
+        #[derive(QueryableByName, Debug, PartialEq)]
+        pub struct Row {
+            #[diesel(sql_type = diesel::sql_types::Integer)]
+            pub x: i32,
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub s: String,
+        }
+    }
+
     #[diesel_dualdb::test(pg, sqlite)]
     async fn async_raw_sql_query(conn: &mut AsyncDualConnection) {
-        #[derive(QueryableByName, Debug, PartialEq)]
-        struct Row {
-            #[diesel(sql_type = diesel::sql_types::Integer)]
-            x: i32,
-            #[diesel(sql_type = diesel::sql_types::Text)]
-            s: String,
-        }
+        use raw::Row;
+
         let rows: Vec<Row> = diesel::sql_query("SELECT 7 AS x, 'seven' AS s")
             .load(conn)
             .await
