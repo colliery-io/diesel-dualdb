@@ -34,7 +34,8 @@ use std::fs;
 use std::path::Path;
 
 use sqlparser::ast::{
-    AlterTableOperation, ColumnOption, DataType, Ident, ObjectName, Statement, TableConstraint,
+    AlterTableOperation, ColumnOption, DataType, Ident, ObjectName, ObjectType, Statement,
+    TableConstraint,
 };
 use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser;
@@ -260,6 +261,20 @@ impl Model {
                         }
                         _ => {}
                     }
+                }
+            }
+            Statement::Drop {
+                object_type: ObjectType::Table,
+                names,
+                ..
+            } => {
+                let dropped: Vec<String> = names.iter().map(last_ident).collect();
+                self.tables.retain(|t| !dropped.contains(&t.name));
+                // A foreign key to a dropped table would leave a `joinable!`
+                // naming a table that no longer exists.
+                for t in &mut self.tables {
+                    t.foreign_keys
+                        .retain(|(_, parent)| !dropped.contains(parent));
                 }
             }
             _ => {}
@@ -698,6 +713,99 @@ mod tests {
             "{s}"
         );
         assert!(s.contains("allow_tables_to_appear_in_same_query!"), "{s}");
+    }
+
+    /// DDB-T-0032: create, copy, drop — the shape of skadi's `book_files` history.
+    #[test]
+    fn drop_table_removes_it_from_schema_rs() {
+        let migs = vec![
+            mig(
+                "0001_books",
+                "CREATE TABLE books (id UUID PRIMARY KEY NOT NULL, title TEXT NOT NULL);",
+            ),
+            mig(
+                "0002_book_files",
+                "CREATE TABLE book_files (\
+                    id UUID PRIMARY KEY NOT NULL, \
+                    book_id UUID NOT NULL REFERENCES books(id), \
+                    path TEXT NOT NULL);",
+            ),
+            mig(
+                "0003_book_editions",
+                "CREATE TABLE book_editions (\
+                    id UUID PRIMARY KEY NOT NULL, \
+                    book_id UUID NOT NULL REFERENCES books(id), \
+                    path TEXT NOT NULL); \
+                 INSERT INTO book_editions (id, book_id, path) \
+                    SELECT id, book_id, path FROM book_files;",
+            ),
+            mig("0004_drop_book_files", "DROP TABLE IF EXISTS book_files;"),
+        ];
+
+        let g = generate(&migs).expect("generate");
+        let s = &g.schema_rs;
+        assert!(
+            !s.contains("book_files"),
+            "dropped table still in schema.rs:\n{s}"
+        );
+        assert!(s.contains("book_editions (id)"), "{s}");
+        assert!(
+            s.contains("diesel::joinable!(book_editions -> books (book_id));"),
+            "{s}"
+        );
+        assert!(s.contains("    books,\n    book_editions,\n);"), "{s}");
+
+        // The per-backend migrations still carry the drop.
+        assert!(g.postgres[3]
+            .up_sql
+            .contains("DROP TABLE IF EXISTS book_files"));
+        assert!(g.sqlite[3]
+            .up_sql
+            .contains("DROP TABLE IF EXISTS book_files"));
+    }
+
+    /// DDB-T-0032: plain `DROP TABLE` and a list of names; a dropped parent
+    /// takes the `joinable!` of its children with it.
+    #[test]
+    fn drop_table_without_if_exists_and_dropped_parent() {
+        let migs = vec![
+            mig(
+                "0001",
+                "CREATE TABLE a (id UUID PRIMARY KEY NOT NULL); \
+                 CREATE TABLE b (id UUID PRIMARY KEY NOT NULL, a_id UUID REFERENCES a(id)); \
+                 CREATE TABLE c (id UUID PRIMARY KEY NOT NULL, b_id UUID REFERENCES b(id)); \
+                 CREATE TABLE d (id UUID PRIMARY KEY NOT NULL);",
+            ),
+            mig("0002", "DROP TABLE a;"),
+            mig("0003", "DROP TABLE c, d;"),
+        ];
+        let s = generate(&migs).expect("generate").schema_rs;
+        assert!(!s.contains("a (id)"), "{s}");
+        assert!(!s.contains("c (id)"), "{s}");
+        assert!(!s.contains("d (id)"), "{s}");
+        assert!(s.contains("b (id)"), "{s}");
+        assert!(!s.contains("joinable!"), "{s}");
+        assert!(!s.contains("allow_tables_to_appear_in_same_query!"), "{s}");
+    }
+
+    /// DDB-T-0032: a table dropped and created again is declared once, in its new shape.
+    #[test]
+    fn drop_then_recreate_declares_the_new_shape_once() {
+        let migs = vec![
+            mig(
+                "0001",
+                "CREATE TABLE t (id UUID PRIMARY KEY NOT NULL, old TEXT);",
+            ),
+            mig("0002", "DROP TABLE t;"),
+            mig(
+                "0003",
+                "CREATE TABLE t (id UUID PRIMARY KEY NOT NULL, new TEXT);",
+            ),
+        ];
+        let s = generate(&migs).expect("generate").schema_rs;
+        assert_eq!(s.matches("diesel::table!").count(), 1, "{s}");
+        assert!(s.contains("new -> Nullable<Text>,"), "{s}");
+        assert!(!s.contains("old ->"), "{s}");
     }
 
     #[test]
