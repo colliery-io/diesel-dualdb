@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-22
+
+### Fixed
+
+- `diesel-dualdb-schema`: a `DROP TABLE [IF EXISTS] x` migration now removes
+  `x` from the generated `schema.rs`: its `table!`, each `joinable!` that
+  names it, and its entry in `allow_tables_to_appear_in_same_query!`
+  (DDB-T-0032).
+
 ## [0.2.0] - 2026-10-07
 
 ### Added
